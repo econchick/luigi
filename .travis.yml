@@ -1,36 +1,50 @@
 language: python
-
+sudo: false
 jdk: oraclejdk7
 
 services:
   - elasticsearch
   - mysql
 
+python:
+  - "2.7"
+  - "3.3"
+  - "3.4"
+  - "3.5"
+  - "pypy"
+
 env:
   global:
     - PIP_DOWNLOAD_CACHE=$HOME/.pip-cache
-    - POSTGRES_USER=postgres
-    - GCS_TEST_PROJECT_ID=luigi-travistestenvironment
-    - GCS_TEST_BUCKET=luigi-travistestenvironment
-    - GOOGLE_APPLICATION_CREDENTIALS=test/gcloud-credentials.json
   matrix:
     - TOXENV=flake8
     - TOXENV=docs
-    - TOXENV=py27-nonhdfs
-    - TOXENV=py33-nonhdfs
-    - TOXENV=py34-nonhdfs
-    - TOXENV=py27-unixsocket
-    - TOXENV=py33-unixsocket
-    - TOXENV=py34-unixsocket
-    - TOXENV=py27-cdh
-    - TOXENV=py33-cdh
-    - TOXENV=py34-cdh
-    - TOXENV=pypy-scheduler
-    - TOXENV=py27-gcloud
-    - TOXENV=py27-postgres
+    - TOXENV=nonhdfs
+    - TOXENV=unixsocket
+    - TOXENV=cdh
+    - TOXENV=scheduler
+    - TOXENV=gcloud
+    - TOXENV=postgres
     - TOXENV=visualiser
+  # only run flake8 and docs on python 3.5 ;)
+  exclude:
+    - python: "2.7"
+        env: TOXENV=flake8
+    - python: "2.7"
+        env: TOXENV=docs
+    - python: "3.3"
+        env: TOXENV=flake8
+    - python: "3.3"
+        env: TOXENV=docs
+    - python: "3.4"
+        env: TOXENV=flake8
+    - python: "3.4"
+        env: TOXENV=docs
+    - python: "pypy"
+        env: TOXENV=flake8
+    - python: "pypy"
+        env: TOXENV=docs
 
-sudo: false
 
 cache:
   - $HOME/.pip-cache
@@ -39,20 +53,20 @@ install:
   - pip install 'tox<3.0'
 
 before_install:
-  - openssl aes-256-cbc -K $encrypted_e05f6ccc270e_key -iv $encrypted_e05f6ccc270e_iv -in test/gcloud-credentials.json.enc -out test/gcloud-credentials.json -d
-    || export DIDNT_CREATE_GCP_CREDS=1
+  - sh -c "if ['$TOXENV' = 'gcloud' ]; then openssl aes-256-cbc -K $encrypted_e05f6ccc270e_key -iv $encrypted_e05f6ccc270e_iv -in test/gcloud-credentials.json.enc -out test/gcloud-credentials.json -d; else export DIDNT_CREATE_GCP_CREDS=1; fi"
 
 before_script:
-  # TODO, only do this step for the postgres environment
-  - psql -c 'create database spotify;' -U postgres
+  # Setup postgres database for postgres env
+  - sh -c "if [ '$TOXENV' = 'postgres' ]; then psql -c 'create database spotify;' -U postgres; fi"
+
+  # Create mysql database for mysql env if possible but fail silently if not available.
+  - sh -c "if [ '$TOXENV' = 'mysql' ]; then mysql -e 'create database IF NOT EXISTS luigi_test;' -uroot || true; fi"
 
   # allow ssh loopback
   - ssh-keygen -t rsa -N '' -C '' -f ~/.ssh/id_rsa
   - cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
   - ssh -o StrictHostKeyChecking=no localhost true
 
-  # Create mysql database if possible but fail silently if not available.
-  - mysql -e 'create database IF NOT EXISTS luigi_test;' -uroot || true
 
 script:
   - tox --version
