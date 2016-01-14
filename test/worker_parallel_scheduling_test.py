@@ -149,7 +149,7 @@ class ParallelSchedulingTest(unittest.TestCase):
             UnpicklableExceptionTask().complete()
         except Exception as e:
             ex = e
-        self.assertRaises(pickle.PicklingError, pickle.dumps, ex)
+        self.assertRaises((pickle.PicklingError, AttributeError), pickle.dumps, ex)
 
         # verify this can run async
         self.w.add(UnpicklableExceptionTask(), multiprocess=True)
